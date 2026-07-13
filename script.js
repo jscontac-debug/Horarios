@@ -14,26 +14,62 @@ function save(){localStorage.setItem(K,JSON.stringify(S))}
 function tab(id){$$("nav button").forEach(b=>b.classList.toggle("active",b.dataset.tab===id));$$(".panel").forEach(p=>p.classList.toggle("active",p.id===id));if(id==="generate")summary()}
 $$("nav button").forEach(b=>b.onclick=()=>tab(b.dataset.tab));
 function render(){renderConfig();renderEmployees();renderAbs();renderCov();renderFixed();renderRecurringConditions();summary();if(G)renderResult()}
-function renderConfig(){storeName.value=S.store.name;agreement.value=S.store.agreement;startDate.value=S.store.start;endDate.value=S.store.end;preferred.value=S.store.preferred;restHours.value=S.store.rest;rotationType.value=S.store.rotationType||"weekly";rotationMode.value=S.store.rotationMode||"flexible";$("#opening tbody").innerHTML=S.store.opening.map((r,i)=>`<tr>
-<td>${r.day}</td>
-<td><input type=time data-o=${i} data-k=start value="${r.start||""}"></td>
-<td><div style="display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap"><input type=time data-o=${i} data-k=end value="${r.end||""}"><button type="button" data-clear-o=${i}>Sin horario</button></div></td>
-<td><input type=number min=0 data-o=${i} data-k=desired value=${r.desired??r.min??3}></td>
-<td><input type=number min=0 data-o=${i} data-k=critical value=${r.critical??Math.max(1,(r.min??3)-1)}></td>
-</tr>`).join("");
-$$("[data-clear-o]").forEach(b=>b.onclick=()=>{
- const i=+b.dataset.clearO;
- const startInput=document.querySelector(`[data-o="${i}"][data-k="start"]`);
- const endInput=document.querySelector(`[data-o="${i}"][data-k="end"]`);
- startInput.value="";
- endInput.value="";
- S.store.opening[i].start="";
- S.store.opening[i].end="";
- S.store.opening[i].open=false;
-});}
-saveConfig.onclick=()=>{S.store.name=storeName.value||"Tienda";S.store.agreement=agreement.value;S.store.start=startDate.value;S.store.end=endDate.value;S.store.preferred=+preferred.value||6;S.store.rest=+restHours.value||12;S.store.rotationType=rotationType.value;S.store.rotationMode=rotationMode.value;$$("[data-o]").forEach(x=>S.store.opening[+x.dataset.o][x.dataset.k]=["desired","critical","min"].includes(x.dataset.k)?+x.value:x.value);
-S.store.opening.forEach(r=>{r.open=Boolean(r.start&&r.end)});
-save();msg("Configuración guardada","ok")}
+function renderConfig(){
+ storeName.value=S.store.name;
+ agreement.value=S.store.agreement;
+ startDate.value=S.store.start;
+ endDate.value=S.store.end;
+ preferred.value=S.store.preferred;
+ restHours.value=S.store.rest;
+ rotationType.value=S.store.rotationType||"weekly";
+ rotationMode.value=S.store.rotationMode||"flexible";
+
+ $("#opening tbody").innerHTML=S.store.opening.map((r,i)=>`<tr>
+   <td>${r.day}</td>
+   <td><input type="time" data-o="${i}" data-k="start" value="${r.start||""}"></td>
+   <td>
+     <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+       <input type="time" data-o="${i}" data-k="end" value="${r.end||""}">
+       <button type="button" class="secondary clear-hours" data-clear-o="${i}">Sin horario</button>
+     </div>
+   </td>
+   <td><input type="number" min="0" data-o="${i}" data-k="desired" value="${r.desired??r.min??3}"></td>
+   <td><input type="number" min="0" data-o="${i}" data-k="critical" value="${r.critical??Math.max(1,(r.min??3)-1)}"></td>
+ </tr>`).join("");
+
+ $$("[data-clear-o]").forEach(b=>b.onclick=()=>{
+   const i=+b.dataset.clearO;
+   const start=document.querySelector(`[data-o="${i}"][data-k="start"]`);
+   const end=document.querySelector(`[data-o="${i}"][data-k="end"]`);
+   start.value="";
+   end.value="";
+   S.store.opening[i].start="";
+   S.store.opening[i].end="";
+   S.store.opening[i].open=false;
+ });
+}
+saveConfig.onclick=()=>{
+ S.store.name=storeName.value||"Tienda";
+ S.store.agreement=agreement.value;
+ S.store.start=startDate.value;
+ S.store.end=endDate.value;
+ S.store.preferred=+preferred.value||6;
+ S.store.rest=+restHours.value||12;
+ S.store.rotationType=rotationType.value;
+ S.store.rotationMode=rotationMode.value;
+
+ $$("[data-o][data-k]").forEach(x=>{
+   const row=S.store.opening[+x.dataset.o];
+   row[x.dataset.k]=["desired","critical","min"].includes(x.dataset.k)?+x.value:x.value;
+ });
+
+ S.store.opening.forEach(r=>{
+   r.open=Boolean(r.start&&r.end);
+ });
+
+ save();
+ msg("Configuración guardada","ok");
+}
 function renderEmployees(){$("#employeesTable tbody").innerHTML=S.employees.map((e,i)=>`<tr><td><input data-e=${i} data-k=name value="${e.name}"></td><td><input type=number data-e=${i} data-k=hours value=${e.hours}></td><td><input type=checkbox data-e=${i} data-k=sunday ${e.sunday?"checked":""}></td><td><input type=checkbox data-e=${i} data-k=opening ${e.opening?"checked":""}></td><td><input type=checkbox data-e=${i} data-k=closing ${e.closing?"checked":""}></td><td><select data-e=${i} data-k=pref>${["Rotativo","Mañana","Tarde","Indiferente"].map(x=>`<option ${x===e.pref?"selected":""}>${x}</option>`)}</select></td><td><button class=delete data-de=${i}>Eliminar</button></td></tr>`).join("");$$("[data-de]").forEach(b=>b.onclick=()=>{S.employees.splice(+b.dataset.de,1);renderEmployees()})}
 addEmployee.onclick=()=>{S.employees.push({name:"Nueva",hours:40,sunday:true,opening:true,closing:true,pref:"Rotativo"});renderEmployees()}
 saveEmployees.onclick=()=>{$$("#employeesTable [data-e]").forEach(x=>{let e=S.employees[+x.dataset.e];e[x.dataset.k]=x.type==="checkbox"?x.checked:(x.dataset.k==="hours"?+x.value:x.value)});save();msg("Empleados guardados","ok")}
