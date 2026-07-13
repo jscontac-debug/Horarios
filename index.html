@@ -7,6 +7,12 @@
 <label>Fecha inicial<input id="startDate" type="date"></label><label>Fecha final<input id="endDate" type="date"></label>
 <label>Turno preferente (h)<input id="preferred" type="number" step=".5"></label>
 <label>Descanso entre jornadas (h)<input id="restHours" type="number" step=".5"></label>
+<label>Máximo de horas por día
+  <input id="maxDailyHours" type="number" min="1" max="24" step=".5">
+</label>
+<label>Máximo de turnos por día
+  <input id="maxDailyShifts" type="number" min="1" max="4" step="1">
+</label>
 <label>Tipo de rotación<select id="rotationType"><option value="daily">Diaria</option><option value="weekly">Semanal</option><option value="biweekly">Quincenal</option><option value="monthly">Mensual</option></select></label>
 <label>Modo de rotación<select id="rotationMode"><option value="flexible">Flexible</option><option value="strict">Estricta</option></select></label></div>
 <h3>Horario y cobertura</h3><div class="critical-note">La cobertura general puede reforzarse con condiciones recurrentes. Ejemplo: lunes a viernes, 20:00–21:00, mínimo crítico 3.</div><div class="tablewrap"><table id="opening"><thead><tr><th>Día</th><th>Inicio</th><th>Fin</th><th>Cobertura deseada</th><th>Mínimo crítico</th></tr></thead><tbody></tbody></table></div><button id="saveConfig">Guardar</button></section>

@@ -1,11 +1,11 @@
 const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"],K="planificadorTurnosMVP1";let S,G=null;
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],uid=()=>Math.random().toString(36).slice(2);
-function defaults(){return{store:{name:"Tienda ejemplo",agreement:"Perfil personalizado",start:"2026-09-01",end:"2026-09-30",preferred:6,rest:12,rotationType:"weekly",rotationMode:"flexible",opening:[
+function defaults(){return{store:{name:"Tienda ejemplo",agreement:"Perfil personalizado",start:"2026-09-01",end:"2026-09-30",preferred:6,rest:12,maxDailyHours:9,maxDailyShifts:1,rotationType:"weekly",rotationMode:"flexible",opening:[
 {day:"Lunes",start:"08:00",end:"21:00",desired:3,critical:2,open:true},{day:"Martes",start:"08:00",end:"21:00",desired:3,critical:2,open:true},{day:"Miércoles",start:"08:00",end:"21:00",desired:3,critical:2,open:true},{day:"Jueves",start:"08:00",end:"21:00",desired:3,critical:2,open:true},{day:"Viernes",start:"08:00",end:"21:00",desired:3,critical:2,open:true},{day:"Sábado",start:"08:00",end:"15:00",desired:3,critical:2,open:true},{day:"Domingo",start:"09:00",end:"14:30",desired:4,critical:3,open:true}]},
 employees:"ABCDEFG".split("").map(n=>({name:n,hours:36,sunday:true,opening:true,closing:true,pref:"Rotativo"})).concat([{name:"H",hours:40,sunday:true,opening:true,closing:true,pref:"Rotativo"}]),absences:[],coverages:[],fixed:[],recurringConditions:[{id:uid(),days:[1,2,3,4,5],from:"20:00",to:"21:00",desired:3,critical:3}]}}
 function load(){
  try{S=JSON.parse(localStorage.getItem(K))||defaults()}catch{S=defaults()}
- S.store.opening.forEach(r=>{if(r.desired==null)r.desired=r.min??3;if(r.critical==null)r.critical=Math.max(1,r.desired-1)});
+ S.store.maxDailyHours=S.store.maxDailyHours||9;S.store.maxDailyShifts=S.store.maxDailyShifts||1;S.store.opening.forEach(r=>{if(r.desired==null)r.desired=r.min??3;if(r.critical==null)r.critical=Math.max(1,r.desired-1)});
  S.coverages=(S.coverages||[]).map(c=>({...c,desired:c.desired??c.people??4,critical:c.critical??Math.max(1,(c.people??4)-1)}));
  S.fixed=(S.fixed||[]).map(f=>({...f,type:f.type||"Obligatoria",repeat:f.repeat||(f.weekly?"Semanal":"Puntual")}));S.recurringConditions=S.recurringConditions||[];
  render();
@@ -21,7 +21,7 @@ function renderConfig(){
  endDate.value=S.store.end;
  preferred.value=S.store.preferred;
  restHours.value=S.store.rest;
- rotationType.value=S.store.rotationType||"weekly";
+ maxDailyHours.value=S.store.maxDailyHours||9;maxDailyShifts.value=S.store.maxDailyShifts||1;rotationType.value=S.store.rotationType||"weekly";
  rotationMode.value=S.store.rotationMode||"flexible";
 
  $("#opening tbody").innerHTML=S.store.opening.map((r,i)=>`<tr>
@@ -54,7 +54,7 @@ saveConfig.onclick=()=>{
  S.store.start=startDate.value;
  S.store.end=endDate.value;
  S.store.preferred=+preferred.value||6;
- S.store.rest=+restHours.value||12;
+ S.store.rest=+restHours.value||12;S.store.maxDailyHours=+maxDailyHours.value||9;S.store.maxDailyShifts=+maxDailyShifts.value||1;
  S.store.rotationType=rotationType.value;
  S.store.rotationMode=rotationMode.value;
 
@@ -146,7 +146,7 @@ function rotationPenalty(emp,d,sh,r){
  return ok?0:((S.store.rotationMode||"flexible")==="strict"?10000:30);
 }
 function candidates(r,slot){
- let st=min(r.start),en=min(r.end),du=Math.round(S.store.preferred*60),o=[];
+ let st=min(r.start),en=min(r.end),du=Math.round(Math.min(S.store.preferred,S.store.maxDailyHours||9)*60),o=[];
  let add=(a,b)=>{
    if(a>=st&&b<=en&&b>a&&slot>=a&&slot<b){
      o.push({start:tm(a),end:tm(b),hours:(b-a)/60});
@@ -220,6 +220,10 @@ function generate(){
      let f=fixedFor(e.name,d);if(!f||f.type!=="Obligatoria")continue;
      if(absent(e.name,iso(d))){warnings.push(`${iso(d)}: ${e.name} tiene asignación obligatoria y ausencia`);continue}
      let sh={start:f.start,end:f.end,hours:hrs(f.start,f.end),fixed:true};
+     if(sh.hours>(S.store.maxDailyHours||9)){
+       warnings.push(`${iso(d)}: la asignación obligatoria de ${e.name} supera el máximo diario de ${S.store.maxDailyHours||9} h`);
+       continue;
+     }
      add(d,e.name,sh,r);slots.forEach(x=>{if(x>=min(sh.start)&&x<min(sh.end))act[x]++});
    }
    // Segunda pasada global: mínimo crítico en toda la jornada.
@@ -263,6 +267,14 @@ function validate(){
    }
  }
  for(let e of S.employees)Object.entries(G.W[e.name]||{}).forEach(([w,h])=>{if(Math.abs(h-e.hours)>.01)warnings.push(`${e.name}, semana ${w}: ${h.toFixed(1)} h / ${e.hours} h`)});
+ for(const d of G.dates){
+   for(const e of S.employees){
+     const sh=G.A[iso(d)+"|"+e.name];
+     if(sh&&sh.hours>(S.store.maxDailyHours||9)){
+       errors.push(`${iso(d)}: ${e.name} trabaja ${sh.hours.toFixed(1)} h y supera el máximo diario de ${S.store.maxDailyHours||9} h`);
+     }
+   }
+ }
  for(const d of G.dates){
    const info=G.surplus?.[iso(d)];
    if(info&&info.surplus>0)warnings.push(`${iso(d)}: sobran ${info.surplus} persona(s) respecto a la necesidad estimada`);
