@@ -1,0 +1,25 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Planificador de Turnos</title><meta name="theme-color" content="#1e7d32"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="style.css"></head><body>
+<header><div><h1>Planificador de Turnos</h1><p>Configurable para tiendas de cualquier lugar de España</p></div><div class="header-actions"><button id="installBtn" class="hidden">Instalar app</button><button id="reset">Restablecer ejemplo</button></div></header>
+<nav><button data-tab="config" class="active">Tienda</button><button data-tab="employees">Empleados</button><button data-tab="rules">Condiciones</button><button data-tab="generate">Generar</button><button data-tab="result">Resultado</button></nav>
+<main>
+<section id="config" class="panel active"><h2>Configuración</h2><div class="grid">
+<label>Nombre<input id="storeName"></label><label>Convenio / perfil<input id="agreement"></label>
+<label>Fecha inicial<input id="startDate" type="date"></label><label>Fecha final<input id="endDate" type="date"></label>
+<label>Turno preferente (h)<input id="preferred" type="number" step=".5"></label>
+<label>Descanso entre jornadas (h)<input id="restHours" type="number" step=".5"></label>
+<label>Tipo de rotación<select id="rotationType"><option value="daily">Diaria</option><option value="weekly">Semanal</option><option value="biweekly">Quincenal</option><option value="monthly">Mensual</option></select></label>
+<label>Modo de rotación<select id="rotationMode"><option value="flexible">Flexible</option><option value="strict">Estricta</option></select></label></div>
+<h3>Horario y cobertura</h3><div class="tablewrap"><table id="opening"><thead><tr><th>Día</th><th>Inicio</th><th>Fin</th><th>Cobertura deseada</th><th>Mínimo crítico</th><th>Abre</th></tr></thead><tbody></tbody></table></div><button id="saveConfig">Guardar</button></section>
+
+<section id="employees" class="panel"><div class="title"><h2>Empleados</h2><button id="addEmployee">Añadir</button></div><div class="tablewrap"><table id="employeesTable"><thead><tr><th>Nombre</th><th>Horas</th><th>Domingos</th><th>Apertura</th><th>Cierre</th><th>Preferencia</th><th></th></tr></thead><tbody></tbody></table></div><button id="saveEmployees">Guardar</button></section>
+
+<section id="rules" class="panel"><div class="card"><div class="title"><h3>Ausencias</h3><button id="addAbsence">Añadir</button></div><div class="tablewrap"><table id="absences"><thead><tr><th>Persona</th><th>Desde</th><th>Hasta</th><th>Tipo</th><th></th></tr></thead><tbody></tbody></table></div></div>
+<div class="card"><div class="title"><h3>Coberturas especiales</h3><button id="addCoverage">Añadir</button></div><div class="tablewrap"><table id="coverages"><thead><tr><th>Fecha</th><th>Desde</th><th>Hasta</th><th>Deseada</th><th>Crítica</th><th></th></tr></thead><tbody></tbody></table></div></div>
+<div class="card"><div class="title"><h3>Asignaciones de persona</h3><button id="addFixed">Añadir</button></div><div class="tablewrap"><table id="fixed"><thead><tr><th>Persona</th><th>Fecha</th><th>Inicio</th><th>Fin</th><th>Tipo</th><th>Repetición</th><th></th></tr></thead><tbody></tbody></table></div></div><button id="saveRules">Guardar condiciones</button></section>
+
+<section id="generate" class="panel"><h2>Generar cuadrante</h2><div id="summary" class="summary"></div><button id="generateBtn" class="big">GENERAR CUADRANTE</button><div id="messages"></div></section>
+
+<section id="result" class="panel"><div class="title"><h2>Resultado</h2><div><button id="monthlyViewBtn" class="viewbtn active">Vista mensual</button><button id="weeklyViewBtn" class="viewbtn">Vista semanal</button><button id="validateBtn">Revalidar</button><button id="exportBtn">Exportar CSV</button><button id="printBtn">Imprimir / PDF</button></div></div><div id="validation"></div>
+<div id="monthlyView"><div class="tablewrap"><table id="schedule"></table></div><h3>Control semanal</h3><div class="tablewrap"><table id="weekly"></table></div></div>
+<div id="weeklyView" class="hidden"><div class="week-toolbar"><button id="prevWeekBtn">◀ Semana anterior</button><div><strong id="weekTitle"></strong><select id="weekSelect"></select></div><button id="nextWeekBtn">Semana siguiente ▶</button></div><div id="weeklyGraphic"></div></div></section>
+</main><script src="script.js"></script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js"));}</script></body></html>
