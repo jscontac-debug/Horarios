@@ -164,6 +164,22 @@ function candidates(r,slot){
  }
  return o.filter((x,i,a)=>a.findIndex(y=>y.start===x.start&&y.end===x.end)===i);
 }
+
+function weeklyEntryTarget(emp,d,rule){
+  if((S.store.rotationType||"weekly")!=="weekly") return null;
+  const week=wk(d);
+  const index=S.employees.findIndex(x=>x.name===emp.name);
+  const seed=Number(week.split("-")[1]||0)+index;
+  const start=min(rule.start), end=min(rule.end), dur=Math.round(S.store.preferred*60);
+  const possible=[start,Math.min(start+60,end-dur),Math.max(start,end-dur)];
+  return possible[Math.abs(seed)%possible.length];
+}
+function weeklyStartPenalty(emp,d,shift,rule){
+  const target=weeklyEntryTarget(emp,d,rule);
+  if(target===null) return 0;
+  const diff=Math.abs(min(shift.start)-target)/30;
+  return (S.store.rotationMode||"flexible")==="strict" ? diff*1000 : diff*40;
+}
 function generate(){
  saveConfig.click();saveEmployees.click();saveRules.click();
  let ds=dates(S.store.start,S.store.end),A={},W={},C={},warnings=[];
@@ -184,7 +200,7 @@ function generate(){
          let h=W[e.name]?.[wk(d)]||0;
          let score=h*10+Math.max(0,h+sh.hours-e.hours)*100+
            C[e.name].open*(sh.start===r.start?4:0)+C[e.name].close*(sh.end===r.end?4:0)+
-           C[e.name].sunday*(d.getDay()===0?15:0)+rotationPenalty(e,d,sh,r);
+           C[e.name].sunday*(d.getDay()===0?15:0)+rotationPenalty(e,d,sh,r)+weeklyStartPenalty(e,d,sh,r);
          const preferred=fixedFor(e.name,d);
          if(preferred&&preferred.type==="Preferente"&&sh.start===preferred.start&&sh.end===preferred.end)score-=100;
          if(!best||score<best.score)best={e,sh,score};
@@ -211,7 +227,29 @@ function generate(){
    // Tercera pasada: completar la cobertura deseada.
    chooseAndAdd(d,r,slots,act,"desired");
  }
- G={dates:ds,A,W,C,warnings};renderResult();tab("result");
+ G={dates:ds,A,W,C,warnings};G.surplus=calculateSurplus(G);renderResult();tab("result");
+}
+
+function calculateSurplus(g){
+  const result={};
+  for(const d of g.dates){
+    const r=rule(d);
+    if(!r.open){result[iso(d)]={assigned:0,needed:0,surplus:0};continue}
+    const assigned=S.employees.filter(e=>g.A[iso(d)+"|"+e.name]).length;
+    let maxNeeded=0;
+    for(let m=min(r.start);m<min(r.end);m+=30){
+      maxNeeded=Math.max(maxNeeded,needLevel(d,m,"desired"));
+    }
+    // Estimate minimum headcount considering preferred shift length and total required hours.
+    let requiredHours=0;
+    for(let m=min(r.start);m<min(r.end);m+=30){
+      requiredHours+=needLevel(d,m,"desired")*.5;
+    }
+    const byHours=Math.ceil(requiredHours/Math.max(1,S.store.preferred));
+    const needed=Math.max(maxNeeded,byHours);
+    result[iso(d)]={assigned,needed,surplus:Math.max(0,assigned-needed)};
+  }
+  return result;
 }
 function validate(){
  let errors=[],warnings=[...(G?.warnings||[])];if(!G)return{errors:["No hay cuadrante"],warnings};
@@ -225,6 +263,10 @@ function validate(){
    }
  }
  for(let e of S.employees)Object.entries(G.W[e.name]||{}).forEach(([w,h])=>{if(Math.abs(h-e.hours)>.01)warnings.push(`${e.name}, semana ${w}: ${h.toFixed(1)} h / ${e.hours} h`)});
+ for(const d of G.dates){
+   const info=G.surplus?.[iso(d)];
+   if(info&&info.surplus>0)warnings.push(`${iso(d)}: sobran ${info.surplus} persona(s) respecto a la necesidad estimada`);
+ }
  return{errors,warnings};
 }
 function renderResult(){let h=`<thead><tr><th>Persona</th>${G.dates.map(d=>`<th class=${d.getDay()===0?"sunday":""}>${d.getDate()}<br>${DAYS[(d.getDay()+6)%7].slice(0,2)}</th>`).join("")}<th>Total</th></tr></thead>`,b=S.employees.map(e=>{let t=0,c=G.dates.map(d=>{let s=G.A[iso(d)+"|"+e.name];if(s)t+=s.hours;return`<td class="${s?"":"free"} ${d.getDay()===0?"sunday":""}">${s?s.start+"-"+s.end:"LIBRE"}</td>`}).join("");return`<tr><th>${e.name}</th>${c}<th>${t.toFixed(1)}</th></tr>`}).join("");schedule.innerHTML=h+"<tbody>"+b+"</tbody>";renderWeekly();renderValidation();setupWeekSelector();renderWeeklyGraphic()}
@@ -271,7 +313,7 @@ function renderDayGraphic(d){
  const deficits=assigned.filter((n,i)=>n<critical[i]).length;
  return `<div class="week-day-block"><div class="week-day-header"><span>${DAYS[(d.getDay()+6)%7]}</span><span>${iso(d)}</span></div>
  <div class="week-grid-wrap"><table class="week-grid"><thead><tr><th class="employee-col">Empleado/a</th>${slots.map(m=>`<th class="slot-head">${tm(m)}<br>${tm(m+30)}</th>`).join("")}<th class="total-col">Horas</th></tr></thead><tbody>${rows}${totalAssigned}${totalRequired}<tr><th class="employee-col">MÍNIMO CRÍTICO</th>${critical.map(n=>`<td>${n}</td>`).join("")}<td class="total-col">—</td></tr></tbody></table></div>
- <div class="week-summary"><div>Horas asignadas<strong>${totalHours.toFixed(2)}</strong></div><div>Máximo simultáneo<strong>${Math.max(...assigned)}</strong></div><div>Mínimo simultáneo<strong>${Math.min(...assigned)}</strong></div><div>Franjas con déficit<strong>${deficits}</strong></div></div></div>`;
+ <div class="week-summary"><div>Horas asignadas<strong>${totalHours.toFixed(2)}</strong></div><div>Máximo simultáneo<strong>${Math.max(...assigned)}</strong></div><div>Mínimo simultáneo<strong>${Math.min(...assigned)}</strong></div><div>Franjas con déficit<strong>${deficits}</strong></div><div>Personal sobrante<strong>${G.surplus?.[iso(d)]?.surplus||0}</strong></div></div></div>`;
 }
 monthlyViewBtn.onclick=()=>{monthlyView.classList.remove("hidden");weeklyView.classList.add("hidden");monthlyViewBtn.classList.add("active");weeklyViewBtn.classList.remove("active")};
 weeklyViewBtn.onclick=()=>{weeklyView.classList.remove("hidden");monthlyView.classList.add("hidden");weeklyViewBtn.classList.add("active");monthlyViewBtn.classList.remove("active");renderWeeklyGraphic()};
