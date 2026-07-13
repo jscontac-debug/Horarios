@@ -2,20 +2,38 @@ const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],uid=()=>Math.random().toString(36).slice(2);
 function defaults(){return{store:{name:"Tienda ejemplo",agreement:"Perfil personalizado",start:"2026-09-01",end:"2026-09-30",preferred:6,rest:12,rotationType:"weekly",rotationMode:"flexible",opening:[
 {day:"Lunes",start:"08:00",end:"21:00",desired:3,critical:2,open:true},{day:"Martes",start:"08:00",end:"21:00",desired:3,critical:2,open:true},{day:"Miércoles",start:"08:00",end:"21:00",desired:3,critical:2,open:true},{day:"Jueves",start:"08:00",end:"21:00",desired:3,critical:2,open:true},{day:"Viernes",start:"08:00",end:"21:00",desired:3,critical:2,open:true},{day:"Sábado",start:"08:00",end:"15:00",desired:3,critical:2,open:true},{day:"Domingo",start:"09:00",end:"14:30",desired:4,critical:3,open:true}]},
-employees:"ABCDEFG".split("").map(n=>({name:n,hours:36,sunday:true,opening:true,closing:true,pref:"Rotativo"})).concat([{name:"H",hours:40,sunday:true,opening:true,closing:true,pref:"Rotativo"}]),absences:[],coverages:[],fixed:[]}}
+employees:"ABCDEFG".split("").map(n=>({name:n,hours:36,sunday:true,opening:true,closing:true,pref:"Rotativo"})).concat([{name:"H",hours:40,sunday:true,opening:true,closing:true,pref:"Rotativo"}]),absences:[],coverages:[],fixed:[],recurringConditions:[{id:uid(),days:[1,2,3,4,5],from:"20:00",to:"21:00",desired:3,critical:3}]}}
 function load(){
  try{S=JSON.parse(localStorage.getItem(K))||defaults()}catch{S=defaults()}
  S.store.opening.forEach(r=>{if(r.desired==null)r.desired=r.min??3;if(r.critical==null)r.critical=Math.max(1,r.desired-1)});
  S.coverages=(S.coverages||[]).map(c=>({...c,desired:c.desired??c.people??4,critical:c.critical??Math.max(1,(c.people??4)-1)}));
- S.fixed=(S.fixed||[]).map(f=>({...f,type:f.type||"Obligatoria",repeat:f.repeat||(f.weekly?"Semanal":"Puntual")}));
+ S.fixed=(S.fixed||[]).map(f=>({...f,type:f.type||"Obligatoria",repeat:f.repeat||(f.weekly?"Semanal":"Puntual")}));S.recurringConditions=S.recurringConditions||[];
  render();
 }
 function save(){localStorage.setItem(K,JSON.stringify(S))}
 function tab(id){$$("nav button").forEach(b=>b.classList.toggle("active",b.dataset.tab===id));$$(".panel").forEach(p=>p.classList.toggle("active",p.id===id));if(id==="generate")summary()}
 $$("nav button").forEach(b=>b.onclick=()=>tab(b.dataset.tab));
-function render(){renderConfig();renderEmployees();renderAbs();renderCov();renderFixed();summary();if(G)renderResult()}
-function renderConfig(){storeName.value=S.store.name;agreement.value=S.store.agreement;startDate.value=S.store.start;endDate.value=S.store.end;preferred.value=S.store.preferred;restHours.value=S.store.rest;rotationType.value=S.store.rotationType||"weekly";rotationMode.value=S.store.rotationMode||"flexible";$("#opening tbody").innerHTML=S.store.opening.map((r,i)=>`<tr><td>${r.day}</td><td><input type=time data-o=${i} data-k=start value=${r.start}></td><td><input type=time data-o=${i} data-k=end value=${r.end}></td><td><input type=number min=0 data-o=${i} data-k=desired value=${r.desired??r.min??3}></td><td><input type=number min=0 data-o=${i} data-k=critical value=${r.critical??Math.max(1,(r.min??3)-1)}></td><td><input type=checkbox data-o=${i} data-k=open ${r.open?"checked":""}></td></tr>`).join("")}
-saveConfig.onclick=()=>{S.store.name=storeName.value||"Tienda";S.store.agreement=agreement.value;S.store.start=startDate.value;S.store.end=endDate.value;S.store.preferred=+preferred.value||6;S.store.rest=+restHours.value||12;S.store.rotationType=rotationType.value;S.store.rotationMode=rotationMode.value;$$("[data-o]").forEach(x=>S.store.opening[+x.dataset.o][x.dataset.k]=x.type==="checkbox"?x.checked:(["desired","critical","min"].includes(x.dataset.k)?+x.value:x.value));save();msg("Configuración guardada","ok")}
+function render(){renderConfig();renderEmployees();renderAbs();renderCov();renderFixed();renderRecurringConditions();summary();if(G)renderResult()}
+function renderConfig(){storeName.value=S.store.name;agreement.value=S.store.agreement;startDate.value=S.store.start;endDate.value=S.store.end;preferred.value=S.store.preferred;restHours.value=S.store.rest;rotationType.value=S.store.rotationType||"weekly";rotationMode.value=S.store.rotationMode||"flexible";$("#opening tbody").innerHTML=S.store.opening.map((r,i)=>`<tr>
+<td>${r.day}</td>
+<td><input type=time data-o=${i} data-k=start value="${r.start||""}"></td>
+<td><div style="display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap"><input type=time data-o=${i} data-k=end value="${r.end||""}"><button type="button" data-clear-o=${i}>Sin horario</button></div></td>
+<td><input type=number min=0 data-o=${i} data-k=desired value=${r.desired??r.min??3}></td>
+<td><input type=number min=0 data-o=${i} data-k=critical value=${r.critical??Math.max(1,(r.min??3)-1)}></td>
+</tr>`).join("");
+$$("[data-clear-o]").forEach(b=>b.onclick=()=>{
+ const i=+b.dataset.clearO;
+ const startInput=document.querySelector(`[data-o="${i}"][data-k="start"]`);
+ const endInput=document.querySelector(`[data-o="${i}"][data-k="end"]`);
+ startInput.value="";
+ endInput.value="";
+ S.store.opening[i].start="";
+ S.store.opening[i].end="";
+ S.store.opening[i].open=false;
+});}
+saveConfig.onclick=()=>{S.store.name=storeName.value||"Tienda";S.store.agreement=agreement.value;S.store.start=startDate.value;S.store.end=endDate.value;S.store.preferred=+preferred.value||6;S.store.rest=+restHours.value||12;S.store.rotationType=rotationType.value;S.store.rotationMode=rotationMode.value;$$("[data-o]").forEach(x=>S.store.opening[+x.dataset.o][x.dataset.k]=["desired","critical","min"].includes(x.dataset.k)?+x.value:x.value);
+S.store.opening.forEach(r=>{r.open=Boolean(r.start&&r.end)});
+save();msg("Configuración guardada","ok")}
 function renderEmployees(){$("#employeesTable tbody").innerHTML=S.employees.map((e,i)=>`<tr><td><input data-e=${i} data-k=name value="${e.name}"></td><td><input type=number data-e=${i} data-k=hours value=${e.hours}></td><td><input type=checkbox data-e=${i} data-k=sunday ${e.sunday?"checked":""}></td><td><input type=checkbox data-e=${i} data-k=opening ${e.opening?"checked":""}></td><td><input type=checkbox data-e=${i} data-k=closing ${e.closing?"checked":""}></td><td><select data-e=${i} data-k=pref>${["Rotativo","Mañana","Tarde","Indiferente"].map(x=>`<option ${x===e.pref?"selected":""}>${x}</option>`)}</select></td><td><button class=delete data-de=${i}>Eliminar</button></td></tr>`).join("");$$("[data-de]").forEach(b=>b.onclick=()=>{S.employees.splice(+b.dataset.de,1);renderEmployees()})}
 addEmployee.onclick=()=>{S.employees.push({name:"Nueva",hours:40,sunday:true,opening:true,closing:true,pref:"Rotativo"});renderEmployees()}
 saveEmployees.onclick=()=>{$$("#employeesTable [data-e]").forEach(x=>{let e=S.employees[+x.dataset.e];e[x.dataset.k]=x.type==="checkbox"?x.checked:(x.dataset.k==="hours"?+x.value:x.value)});save();msg("Empleados guardados","ok")}
@@ -26,7 +44,25 @@ function renderCov(){$("#coverages tbody").innerHTML=S.coverages.map((c,i)=>`<tr
 addCoverage.onclick=()=>{S.coverages.push({id:uid(),date:S.store.start,from:"08:00",to:"15:00",desired:4,critical:2});renderCov()}
 function renderFixed(){$("#fixed tbody").innerHTML=S.fixed.map((f,i)=>`<tr><td><select data-f=${i} data-k=employee>${opts(f.employee)}</select></td><td><input type=date data-f=${i} data-k=date value=${f.date}></td><td><input type=time data-f=${i} data-k=start value=${f.start}></td><td><input type=time data-f=${i} data-k=end value=${f.end}></td><td><select data-f=${i} data-k=type><option ${f.type==="Obligatoria"?"selected":""}>Obligatoria</option><option ${f.type==="Preferente"?"selected":""}>Preferente</option></select></td><td><select data-f=${i} data-k=repeat>${["Puntual","Semanal","Quincenal","Mensual"].map(x=>`<option ${f.repeat===x?"selected":""}>${x}</option>`).join("")}</select></td><td><button class=delete data-df=${i}>Eliminar</button></td></tr>`).join("");$$("[data-df]").forEach(b=>b.onclick=()=>{S.fixed.splice(+b.dataset.df,1);renderFixed()})}
 addFixed.onclick=()=>{S.fixed.push({id:uid(),employee:S.employees[0]?.name||"",date:S.store.start,start:"08:00",end:"14:00",type:"Obligatoria",repeat:"Puntual"});renderFixed()}
-saveRules.onclick=()=>{[["a","absences"],["c","coverages"],["f","fixed"]].forEach(([p,k])=>$$(`[data-${p}]`).forEach(x=>S[k][+x.dataset[p]][x.dataset.k]=x.type==="checkbox"?x.checked:(["people","desired","critical"].includes(x.dataset.k)?+x.value:x.value)));save();msg("Condiciones guardadas","ok")}
+
+function renderRecurringConditions(){
+ const labels=["L","M","X","J","V","S","D"];
+ recurringConditions.querySelector("tbody").innerHTML=(S.recurringConditions||[]).map((c,i)=>`<tr>
+ <td><div class="days-picker">${labels.map((lab,idx)=>`<label><input type="checkbox" data-r="${i}" data-day="${idx+1}" ${c.days.includes(idx+1)?"checked":""}>${lab}</label>`).join("")}</div></td>
+ <td><input type="time" data-r="${i}" data-k="from" value="${c.from}"></td>
+ <td><input type="time" data-r="${i}" data-k="to" value="${c.to}"></td>
+ <td><input type="number" min="0" data-r="${i}" data-k="desired" value="${c.desired}"></td>
+ <td><input type="number" min="0" data-r="${i}" data-k="critical" value="${c.critical}"></td>
+ <td><button class="delete" data-dr="${i}">Eliminar</button></td></tr>`).join("");
+ $$("[data-dr]").forEach(b=>b.onclick=()=>{S.recurringConditions.splice(+b.dataset.dr,1);renderRecurringConditions()});
+}
+addRecurringCondition.onclick=()=>{S.recurringConditions.push({id:uid(),days:[1,2,3,4,5],from:"20:00",to:"21:00",desired:3,critical:3});renderRecurringConditions()};
+saveRules.onclick=()=>{
+ [["a","absences"],["c","coverages"],["f","fixed"]].forEach(([p,k])=>$$(`[data-${p}]`).forEach(x=>S[k][+x.dataset[p]][x.dataset.k]=x.type==="checkbox"?x.checked:(["people","desired","critical"].includes(x.dataset.k)?+x.value:x.value)));
+ (S.recurringConditions||[]).forEach((c,i)=>{c.days=$$(`[data-r="${i}"][data-day]`).filter(x=>x.checked).map(x=>+x.dataset.day)});
+ $$(`[data-r][data-k]`).forEach(x=>{const c=S.recurringConditions[+x.dataset.r];c[x.dataset.k]=["desired","critical"].includes(x.dataset.k)?+x.value:x.value});
+ save();msg("Condiciones guardadas","ok");
+}
 function dates(a,b){let r=[],d=new Date(a+"T00:00"),e=new Date(b+"T00:00");for(;d<=e;d.setDate(d.getDate()+1))r.push(new Date(d));return r}function iso(d){
   const y=d.getFullYear();
   const m=String(d.getMonth()+1).padStart(2,"0");
@@ -47,7 +83,13 @@ function dates(a,b){let r=[],d=new Date(a+"T00:00"),e=new Date(b+"T00:00");for(;
    return f.date===ds;
  });
 }
-function needLevel(d,m,level){const r=rule(d);let n=level==="critical"?(r.critical??Math.max(1,r.desired-1)):(r.desired??r.min??3);S.coverages.filter(c=>c.date===iso(d)).forEach(c=>{if(m>=min(c.from)&&m<min(c.to))n=Math.max(n,level==="critical"?c.critical:c.desired)});return n}
+function needLevel(d,m,level){
+ const r=rule(d);let n=level==="critical"?(r.critical??Math.max(1,r.desired-1)):(r.desired??r.min??3);
+ S.coverages.filter(c=>c.date===iso(d)).forEach(c=>{if(m>=min(c.from)&&m<min(c.to))n=Math.max(n,level==="critical"?c.critical:c.desired)});
+ const weekday=d.getDay()===0?7:d.getDay();
+ (S.recurringConditions||[]).forEach(c=>{if(c.days.includes(weekday)&&m>=min(c.from)&&m<min(c.to))n=Math.max(n,level==="critical"?c.critical:c.desired)});
+ return n;
+}
 
 function rotationPeriodKey(d){
  const t=S.store.rotationType||"weekly";
@@ -199,7 +241,7 @@ monthlyViewBtn.onclick=()=>{monthlyView.classList.remove("hidden");weeklyView.cl
 weeklyViewBtn.onclick=()=>{weeklyView.classList.remove("hidden");monthlyView.classList.add("hidden");weeklyViewBtn.classList.add("active");monthlyViewBtn.classList.remove("active");renderWeeklyGraphic()};
 prevWeekBtn.onclick=()=>{currentWeekIndex=Math.max(0,currentWeekIndex-1);renderWeeklyGraphic()};
 nextWeekBtn.onclick=()=>{currentWeekIndex=Math.min(getWeekGroups().length-1,currentWeekIndex+1);renderWeeklyGraphic()};
-function summary(){let n=dates(S.store.start,S.store.end).length;summary.innerHTML=[["Periodo",n+" días"],["Empleados",S.employees.length],["Ausencias",S.absences.length],["Turnos fijos",S.fixed.length]].map(x=>`<div>${x[0]}<strong>${x[1]}</strong></div>`).join("")}
+function summary(){let n=dates(S.store.start,S.store.end).length;summary.innerHTML=[["Periodo",n+" días"],["Empleados",S.employees.length],["Ausencias",S.absences.length],["Condiciones",S.recurringConditions.length]].map(x=>`<div>${x[0]}<strong>${x[1]}</strong></div>`).join("")}
 function exportCSV(){if(!G)return;let r=[["Persona",...G.dates.map(iso),"Total"]];S.employees.forEach(e=>{let t=0,a=[e.name];G.dates.forEach(d=>{let s=G.A[iso(d)+"|"+e.name];a.push(s?s.start+"-"+s.end:"LIBRE");if(s)t+=s.hours});a.push(t.toFixed(1));r.push(a)});let csv="\uFEFF"+r.map(x=>x.map(y=>`"${String(y).replaceAll('"','""')}"`).join(";")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="cuadrante.csv";a.click()}
 function msg(t,c){messages.innerHTML=`<div class="msg ${c}">${t}</div>`}
 generateBtn.onclick=generate;validateBtn.onclick=renderValidation;exportBtn.onclick=exportCSV;printBtn.onclick=()=>print();reset.onclick=()=>{if(confirm("¿Restablecer el ejemplo?")){S=defaults();G=null;save();render();tab("config")}};load();
